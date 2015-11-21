@@ -553,6 +553,21 @@ static uint32_t
 allocate_block(void)
 {
 	/* EXERCISE: Your code here */
+	//Jason do this one 
+	
+	//Access the block that we want to modify
+	//Copied from TA's code from discussion
+	void *bitmap = ospfs_block(OSPFS_FREEMPA_BLK);
+
+	int i;
+	for (i = 0; i<ospfs_super->os_nblocks; i++)
+	{
+		if (bitvector_test(bitmap, i))
+		{
+			bitvector_clear(bitmap,i);
+			return i;
+		}
+	}
 	return 0;
 }
 
@@ -571,7 +586,9 @@ allocate_block(void)
 static void
 free_block(uint32_t blockno)
 {
-	/* EXERCISE: Your code here */
+	void *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+
+	bitvector_set(bitmap, blockno);
 }
 
 
@@ -607,8 +624,8 @@ free_block(uint32_t blockno)
 static int32_t
 indir2_index(uint32_t b)
 {
-	// Your code here.
-	return -1;
+	// FILL in CODE (DONE)
+	b < OSPFS_NDIRECT + OSPFS_NINDIRECT ? return -1 : return 0;
 }
 
 
@@ -626,8 +643,14 @@ indir2_index(uint32_t b)
 static int32_t
 indir_index(uint32_t b)
 {
-	// Your code here.
-	return -1;
+	// Your code here. (DONE)
+	if (b < OSPFS_NDIRECT)
+		return -1;
+	else if (b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+		return 0;
+	
+	return (b - OSPFFS_NDIRECT - OSPFS_NINDIRECT)/ OSPFS_NINDIRECT;
+
 }
 
 
@@ -643,8 +666,13 @@ indir_index(uint32_t b)
 static int32_t
 direct_index(uint32_t b)
 {
-	// Your code here.
-	return -1;
+	// Your code here. (DONE)
+	if ( b < OSPFS_NDIRECT)
+		return b;
+	else if (b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+		return b - OSPFS_NDIRECT;
+	
+	return (b - OSPFS_NDIRECT) % OSPFS_NINDIRECT;
 }
 
 
@@ -1073,15 +1101,46 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 //   2. Find an empty inode.  Set the 'entry_ino' variable to its inode number.
 //   3. Initialize the directory entry and inode.
 //
-//   EXERCISE: Complete this function.
+//   EXERCISE: Complete this function. (WORKING ON IT)
 
 static int
 ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
+	/* EXERCISE: Your code here. */ //(WORKING ON IT)
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
+	ospfs_inode_t * file_oi = NULL;
 	uint32_t entry_ino = 0;
-	/* EXERCISE: Your code here. */
-	return -EINVAL; // Replace this line
+	uint32_t block_no = 0;
+	ospfs_directory_t * new_entry = NULL;
+	ospfs_inode_t * inode;
+
+	//Preliminary checks to the function for EEXIST error 
+
+	if (dentry->name.len > OSPFS_MAXNAMELEN)
+		return _ENAMETOOLONG;
+	
+	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
+		return -EEXIST;
+
+	//Find an empty inode
+
+	
+	entry_ino = find_free_inode();
+	if (entry_ino == ospfs_super->os_ninodes)
+		return -ENOSPC;
+
+	//Now to create a new directory entry 
+	num_entry = create_blank_direntry(dir_oi);
+	new_entry->od_ino = entry_ino;
+	
+	//Creating the new file 
+	file_oi = ospfs_inode(entry_ino);
+	file_oi->oi_size = 0;
+	file_oi->oi_type = OSPFS_FTYPE_REG
+	file_oi->oi_nlink = 1;
+	file_oi->oi_mode = mode;
+
+	
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
