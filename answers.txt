@@ -27,19 +27,19 @@ Email:
 
 TO DO LIST
     *
-      Support for reading files: ospfs_read (15%)
+      Support for reading files: ospfs_read (15%) (Complete)
     *
       Support for reading directories: ospfs_dir_readdir (10%)
     *
       Free block bitmap bookkeeping: allocate_block, free_block (15%) (Complete)
     *
-      Support for changing file sizes: change_size (15%) (Working on it)
+      Support for changing file sizes: change_size (15%) (Prelim functions are complete but not done overall Functions that require implementation)
     *
-      Support for writing files: ospfs_write (15%)
+      Support for writing files: ospfs_write (15%) (Complete)
     *
       Support for creating files: ospfs_create (10%) (Complete)
     *
-      Support for creating hard links: ospfs_link (5%) (Support Links for 20%)
+      Support for creating hard links: ospfs_link (5%) (Psuedocode Annotations Made)
     *
       Support for creating and deleting symbolic links: ospfs_symlink and ospfs_unlink (10%)
     *

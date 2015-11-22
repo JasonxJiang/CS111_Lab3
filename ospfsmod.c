@@ -873,6 +873,9 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 	// Make sure we don't read past the end of the file!
 	// Change 'count' so we never read past the end of the file.
 	/* EXERCISE: Your code here */
+	//A 
+	if (*f_pos + count > oi->oi_size)
+		count = oi->oi_size - *f_pos;
 
 	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
@@ -893,8 +896,12 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// into user space.
 		// Use variable 'n' to track number of bytes moved.
 		/* EXERCISE: Your code here */
-		retval = -EIO; // Replace these lines
-		goto done;
+		//Taken from TA again
+		if (count + (*f_pos % OSPFS_BLKSIZE) - amount > OSPFS_BLKSIZE)
+			n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
+		else
+			n = count - amount;
+		retval = copy_to_user(buffer, data, n);
 
 		buffer += n;
 		amount += n;
@@ -934,9 +941,20 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	// use struct file's f_flags field and the O_APPEND bit.
 	/* EXERCISE: Your code here */
 
+	// TO support the 0_APpend flag compare the f_flags and 0 append bit 
+
+	if (filp->f_flags & 0_APPEND)
+		*f_pos = oi->oi_size;
+
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
+	//Change size must return successfully otherwise cut the program off short
+	if ((*f_pos + count) > oi->oi_size)
+	{
+		if (change_size(oi, (*f_pos + count)) < 0)
+			goto done;
+	}
 
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
@@ -956,8 +974,20 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		// read user space.
 		// Keep track of the number of bytes moved in 'n'.
 		/* EXERCISE: Your code here */
-		retval = -EIO; // Replace these lines
-		goto done;
+		n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
+
+		//Trim size of n if necessary 
+		if (n > count - amount)
+			n = count - amount;
+		//Copy must be successful otherwise whats the point?
+		if (copy_from_user((*f_pos % OSPFS_BLKSIZE) + data, buffer,n)
+			return -EFAULT;
+		
+		if (retval < 0)
+		{
+			retval = -EFAULT;
+			goto done;
+		}
 
 		buffer += n;
 		amount += n;
@@ -1071,6 +1101,18 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 static int
 ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
 	/* EXERCISE: Your code here. */
+
+	//Psuedocode of the function
+	
+	//KEY CHECKS that must be done before any link is made
+	//Check if name is too long 
+	// Check if directory already exists 
+
+	//Create the hardlink itself with create_blank_direntry 
+
+	//Copy file information by modifying all its fields 
+
+	//increase the source file link count and return 0 for success
 	return -EINVAL;
 }
 
