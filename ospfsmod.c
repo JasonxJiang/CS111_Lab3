@@ -453,8 +453,8 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 *
 		 * EXERCISE: Your code here */
 		if(f_pos > dir_oi->oi_size * OSPFS_DIRENTRY_SIZE){
-			r = 1;		/* Fix me! */
-			break;		/* Fix me! */
+			r = 1;		/* Fixed */
+			break;		/* Fixed */
 		}
 		/* Get a pointer to the next entry (od) in the directory.
 		 * The file system interprets the contents of a
@@ -477,6 +477,25 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 
 		/* EXERCISE: Your code here */
+		
+		// get the directory entry's corresponding inode
+		od = ospfs_inode_data(dir_oi, f_pos*OSPFS_DIRENTRY_SIZE);
+		oi_struc = ospfs_inode(od->od_ino);
+		
+		// ignoring blank directory entries
+		if(oi_struc > 0){
+			// figure out which type of file
+			switch(oi_struc->oi_ftype){
+				case OSPFS_FTYPE_REG:
+					break;
+				case OSPFS_FTYPE_DIR:
+					break;
+				case OSPFS_FTYPE_SYMLINK:
+					break;
+				default:
+					continue;
+			}
+		}
 	}
 
 	// Save the file position and return!
