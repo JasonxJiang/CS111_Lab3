@@ -452,9 +452,10 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-		r = 1;		/* Fix me! */
-		break;		/* Fix me! */
-
+		if(f_pos > dir_oi->oi_size * OSPFS_DIRENTRY_SIZE){
+			r = 1;		/* Fix me! */
+			break;		/* Fix me! */
+		}
 		/* Get a pointer to the next entry (od) in the directory.
 		 * The file system interprets the contents of a
 		 * directory-file as a sequence of ospfs_direntry structures.
