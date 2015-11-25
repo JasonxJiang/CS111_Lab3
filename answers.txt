@@ -29,7 +29,7 @@ TO DO LIST
     *
       Support for reading files: ospfs_read (15%) (Complete)
     *
-      Support for reading directories: ospfs_dir_readdir (10%)
+      Support for reading directories: ospfs_dir_readdir (10%) (COMPLETE)
     *
       Free block bitmap bookkeeping: allocate_block, free_block (15%) (Complete)
     *

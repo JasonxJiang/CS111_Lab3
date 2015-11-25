@@ -477,7 +477,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 
 		/* EXERCISE: Your code here */
-		
+		// JIMIN
 		// get the directory entry's corresponding inode
 		od = ospfs_inode_data(dir_oi, f_pos*OSPFS_DIRENTRY_SIZE);
 		oi_struc = ospfs_inode(od->od_ino);
@@ -487,15 +487,21 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			// figure out which type of file
 			switch(oi_struc->oi_ftype){
 				case OSPFS_FTYPE_REG:
+					ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_REG);
 					break;
 				case OSPFS_FTYPE_DIR:
+					ok_so_far = filldir(dirent, o->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_DIR);
 					break;
 				case OSPFS_FTYPE_SYMLINK:
+					ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_LNK);
 					break;
 				default:
+					eprintk("Error in filling in directory entry\n");
+					r=1;
 					continue;
 			}
 		}
+		f_pos++;
 	}
 
 	// Save the file position and return!
