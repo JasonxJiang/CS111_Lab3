@@ -878,9 +878,9 @@ remove_block(ospfs_inode_t *oi)
 	// no blocks to remove, return successfully
 	else if(n == 0)
 		return 0;
-	
+	n = n-1;	
 	// free direct block
-	if((n-1) < OSPFS_NDIRECT)
+	if(n < OSPFS_NDIRECT)
 	{
 		free_block(oi->oi_direct[n]);
 		oi->oi_direct[n] = 0;
