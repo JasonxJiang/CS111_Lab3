@@ -977,17 +977,33 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 	int r = 0;
 
 	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+	        /* JIMIN */
+		r = add_block(oi);
+		if(r < 0)
+			break;
 	}
+	// check for error
+	if(r == -EIO)
+		return r;
+	// back to old size
+	else if(r == -ENOSPC)
+	{
+		while(ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(old_size))
+			r = remove_block(oi);
+		oi->oi_size = old_size;
+		return -ENOSPC;
+	}
+	
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+	        r = remove_block(oi);
+		if(r < 0)
+			return r;
 	}
-
+	
 	/* EXERCISE: Make sure you update necessary file meta data
 	             and return the proper value. */
-	return -EIO; // Replace this line
+	oi->oi_size = new_size;
+	return 0;	// successful return
 }
 
 
@@ -1075,8 +1091,8 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// Copy data into user space. Return -EFAULT if unable to write
 		// into user space.
 		// Use variable 'n' to track number of bytes moved.
-		/* EXERCISE: Your code here */
-		//Taken from TA again
+		
+		// DONE
 		if (count + (*f_pos % OSPFS_BLKSIZE) - amount > OSPFS_BLKSIZE)
 			n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
 		else
@@ -1119,7 +1135,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 
 	// Support files opened with the O_APPEND flag.  To detect O_APPEND,
 	// use struct file's f_flags field and the O_APPEND bit.
-	/* EXERCISE: Your code here */
+	/* DONE */
 
 	// TO support the 0_APpend flag compare the f_flags and 0 append bit 
 
@@ -1128,7 +1144,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
-	/* EXERCISE: Your code here */
+	/* DONE */
 	//Change size must return successfully otherwise cut the program off short
 	if ((*f_pos + count) > oi->oi_size)
 	{
@@ -1245,8 +1261,28 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	//    Use ERR_PTR if this fails; otherwise, clear out all the directory
 	//    entries and return one of them.
 
-	/* EXERCISE: Your code here. */
-	return ERR_PTR(-EINVAL); // Replace this line
+	/* JIMIN */
+	ospfs_direntry_t *direntry;
+	
+	// search for empty direntry
+	uint32_t index;
+	for(index = 0; index < dir_oi->oi_size; index += OSPFS_DIRENTRY_SIZE)
+	{
+		direntry = ospfs_inode_data(dir_oi, index);
+		if(direntry->od_ino == 0)
+			return direntry;
+	}
+
+	// if no empty direntry, add block
+	int val;
+	val = add_block(dir_oi);
+	if(val < 0)
+		return ERR_PTR(val);
+	
+	// add at index = current oi_size
+	direntry = ospfs_inode_data(dir_oi, index);
+	
+	return direntry;
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
@@ -1280,20 +1316,34 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 
 static int
 ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
-	/* EXERCISE: Your code here. */
+	/* JIMIN */
 
 	//Psuedocode of the function
-	
+	ospfs_direntry_t *hardlink;
+
 	//KEY CHECKS that must be done before any link is made
 	//Check if name is too long 
-	// Check if directory already exists 
+	if(dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
+		return -ENAMETOOLONG;
+
+	// Check if directory entry exists 
+	if(find_direntry(ospfs_inode(dir->i_ino), dst_dentry->d_name.name, dst_dentry->d_name.len))
+		return -EEXIST;
 
 	//Create the hardlink itself with create_blank_direntry 
+	hardlink = create_blank_direntry(ospfs_inode(dir->i_ino));
+	if(IS_ERR(hardlink))
+		return PTR_ERR(hardlink);
 
 	//Copy file information by modifying all its fields 
+	hardlink->od_ino = src_dentry->d_inode->i_ino;
+	memcpy(hardlink->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
+	hardlink->od_name[dst_dentry->d_name.len] = '\0';
 
-	//increase the source file link count and return 0 for success
-	return -EINVAL;
+	//increase the source file link count
+	ospfs_inode(src_dentry->d_inode->i_ino)->oi_nlink++;
+	
+	return 0;	// successful return
 }
 
 // ospfs_create
@@ -1330,38 +1380,47 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 {
 	/* EXERCISE: Your code here. */ //(WORKING ON IT)
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
-	ospfs_inode_t * file_oi = NULL;
-	uint32_t entry_ino = 0;
-	uint32_t block_no = 0;
-	ospfs_directory_t * new_entry = NULL;
+	uint32_t entry_inode = 0;
+
+	ospfs_directory_t * direntry = NULL;
 	ospfs_inode_t * inode;
 
 	//Preliminary checks to the function for EEXIST error 
 
-	if (dentry->name.len > OSPFS_MAXNAMELEN)
-		return _ENAMETOOLONG;
+	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+		return -ENAMETOOLONG;
 	
 	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
-
-	//Find an empty inode
-
 	
-	entry_ino = find_free_inode();
+
+	// create a new directory entry 
+	direntry = create_blank_direntry(dir_oi);
+	// check for errors
+	if(IS_ERR(direntry))
+		return PTR_ERR(direntry);
+	// initialize directory entry
+	direntry->od_ino = entry_ino;
+	
+	// search for empty inode
+	for(entry_inode = 0; entry_inode < ospfs_super->os_ninodes; entry_inode++)
+	{
+		inode = ospfs_inode(entry_inode);
+		// if empty inode, break
+		if(inode->oi_nlink == 0)
+			break;
+	}
 	if (entry_ino == ospfs_super->os_ninodes)
 		return -ENOSPC;
 
-	//Now to create a new directory entry 
-	num_entry = create_blank_direntry(dir_oi);
-	new_entry->od_ino = entry_ino;
+	// create the new file
+	memcpy(direntry->od_name, dentry->d_name.name, dentry->d_name.len);
+	direntry->od_name[dentry->d_name.len] = '\0';
 	
-	//Creating the new file 
-	file_oi = ospfs_inode(entry_ino);
-	file_oi->oi_size = 0;
-	file_oi->oi_type = OSPFS_FTYPE_REG
-	file_oi->oi_nlink = 1;
-	file_oi->oi_mode = mode;
-
+	inode->oi_size = 0;
+	inode->oi_nlink = 1;
+	inode->oi_ftype = OSPFS_FTYPE_REG;
+	inode->oi_mode = mode;
 	
 
 	/* Execute this code after your function has successfully created the
@@ -1403,10 +1462,32 @@ static int
 ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
-	uint32_t entry_ino = 0;
+	uint32_t entry_inode = 0;
 
-	/* EXERCISE: Your code here. */
-	return -EINVAL;
+	/* JIMIN */
+	ospfs_symlink_inode_t *symlink;
+
+	// check if name is too long
+	if(dentry->d_name.len > OSPFS_MAXNAMELEN || strlen(symname) > OSPFS_MAXSYMLINKLEN)
+		return -ENAMETOOLONG;
+	
+	// check if direntry exists
+	if(find_direntry(ospfs_inode(dir->i_ino), dentry->d_name.name, dentry->d_name.len))
+		return -EEXIST;
+
+	// create new file with symlink
+	entry_inode = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
+	if(entry_inode < 0)
+		return entry_inode;
+
+	entry_inode = find_direntry(ospfs_inode(dir->i_ino), dentry->d_name.name, dentry->d_name.len)->od_ino;
+	symlink = (ospfs_symlink_inode_t*) ospfs_inode(entry_inode);
+	
+	// file info
+	symlink->oi_size = strlen(symname);
+	symlink->oi_nlink = 1;
+	symlink->oi_ftype = OSPFS_FTYPE_SYMLINK;
+	memcpy(symlink->oi_symlink, symname, strlen(symname));
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
@@ -1439,9 +1520,29 @@ ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
-	// Exercise: Your code here.
+	// JIMIN
+	// check for conditional symlink type
+	if(strncmp(oi->oi_symlink, "root?", 5) == 0)
+	{
+		// find connection between first and second paths
+		int conn = strchr(oi->oi_symlink, ':') - oi->oi_symlink;
+		// user is root
+		if(current->uid == 0)
+		{
+			oi->oi_symlink[conn] = '\0';
+			// first path
+			nd_set_link(nd, oi->oi_symlink + 5 + 1);
+		}
+		else	// user is normal
+		{
+			//second path
+			nd_set_link(nd, oi->oi_symlink + conn + 1);
+		}
+	}
+	else
+		nd_set_link(nd, oi->oi_symlink);
 
-	nd_set_link(nd, oi->oi_symlink);
+	// successful return
 	return (void *) 0;
 }
 
