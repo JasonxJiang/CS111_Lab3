@@ -1403,9 +1403,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	// check for errors
 	if(IS_ERR(direntry))
 		return PTR_ERR(direntry);
-	// initialize directory entry
-	direntry->od_ino = entry_inode;
-	
+
 	// search for empty inode
 	for(entry_inode = 0; entry_inode < ospfs_super->os_ninodes; entry_inode++)
 	{
@@ -1418,6 +1416,8 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 		return -ENOSPC;
 
 	// create the new file
+	// initialize directory entry
+	direntry->od_ino = entry_inode;	
 	memcpy(direntry->od_name, dentry->d_name.name, dentry->d_name.len);
 	direntry->od_name[dentry->d_name.len] = '\0';
 	
